@@ -355,3 +355,89 @@ def create_fake_build_artifacts(tmpdir):
         ensure=True,
     )
     tmpdir.join('artifacts/packages/package/package--version.tar.xz').write('contents_of_package', ensure=True)
+
+
+def test_do_aws_cf_configure_s3_location_used_when_template_upload(tmpdir, monkeypatch):
+    monkeypatch.setattr("dcos_installer.backend.calculate_aws_template_storage_region_name.__code__",
+                        mock_calculate_aws_template_storage_region_name.__code__)
+    monkeypatch.setenv('BOOTSTRAP_VARIANT', 'test_variant')
+    genconf_dir = tmpdir.join('genconf')
+    genconf_dir.ensure(dir=True)
+    config_path = genconf_dir.join('config.yaml')
+    config_path.write(valid_storage_config.format(
+        '~~access_key_id~~',
+        'eu-central-1',
+        '~~secret_access_key~~'))
+    genconf_dir.join('ip-detect').write('#!/bin/bash\necho 127.0.0.1')
+    tmpdir.join('artifacts/bootstrap/12345.bootstrap.tar.xz').write('contents_of_bootstrap', ensure=True)
+    tmpdir.join('artifacts/bootstrap/12345.active.json').write('{"active": "contents"}', ensure=True)
+
+    with tmpdir.as_cwd():
+        assert backend.do_aws_cf_configure() == 0
+        actual_config = Config(tmpdir.join('genconf/cloudformation/config.yaml').read())
+        assert actual_config["aws_template_storage_region_name"] == "us-west-2"
+
+
+err_storage_config = """---
+master_list:
+ - 127.0.0.1
+aws_template_storage_access_key_id: ~~access_key_id~~
+aws_template_storage_bucket: psychic
+aws_template_storage_bucket_path: mofo-the-gorilla
+aws_template_storage_region_name: us-west-2
+aws_template_storage_secret_access_key: ~~secret_access_key~~
+aws_template_upload: true
+"""
+
+
+def test_do_aws_cf_configure_errors_when_both_upload_and_storage_region_specified(tmpdir, monkeypatch, capsys):
+    monkeypatch.setattr("dcos_installer.backend.calculate_aws_template_storage_region_name.__code__",
+                        mock_calculate_aws_template_storage_region_name.__code__)
+    monkeypatch.setenv('BOOTSTRAP_VARIANT', 'test_variant')
+    genconf_dir = tmpdir.join('genconf')
+    genconf_dir.ensure(dir=True)
+    config_path = genconf_dir.join('config.yaml')
+    config_path.write(err_storage_config)
+    genconf_dir.join('ip-detect').write('#!/bin/bash\necho 127.0.0.1')
+    tmpdir.join('artifacts/bootstrap/12345.bootstrap.tar.xz').write('contents_of_bootstrap', ensure=True)
+    tmpdir.join('artifacts/bootstrap/12345.active.json').write('{"active": "contents"}', ensure=True)
+
+    with tmpdir.as_cwd():
+        assert backend.do_aws_cf_configure() != 0
+        out, err = capsys.readouterr()
+        assert err == "aws_template_storage_region_name must be calculated, but was explicitly " \
+            "set in the configuration. Remove it from the configuration."
+
+
+non_upload_storage_config = """---
+master_list:
+ - 127.0.0.1
+aws_template_storage_bucket: psychic
+aws_template_storage_bucket_path: mofo-the-gorilla
+aws_template_storage_region_name: us-east-1
+aws_template_upload: false
+"""
+
+
+def test_do_aws_cf_configure_storage_region_used_when_upload_false(tmpdir, monkeypatch):
+    monkeypatch.setattr("dcos_installer.backend.calculate_aws_template_storage_region_name.__code__",
+                        mock_calculate_aws_template_storage_region_name.__code__)
+    monkeypatch.setenv('BOOTSTRAP_VARIANT', 'test_variant')
+    genconf_dir = tmpdir.join('genconf')
+    genconf_dir.ensure(dir=True)
+    config_path = genconf_dir.join('config.yaml')
+    config_path.write(non_upload_storage_config)
+    genconf_dir.join('ip-detect').write('#!/bin/bash\necho 127.0.0.1')
+    tmpdir.join('artifacts/bootstrap/12345.bootstrap.tar.xz').write('contents_of_bootstrap', ensure=True)
+    tmpdir.join('artifacts/bootstrap/12345.active.json').write('{"active": "contents"}', ensure=True)
+
+    with tmpdir.as_cwd():
+        assert backend.do_aws_cf_configure() == 0
+        actual_config = Config(tmpdir.join('genconf/cloudformation/config.yaml').read())
+        assert actual_config["aws_template_storage_region_name"] == "us-east-1"
+
+
+def mock_calculate_aws_template_storage_region_name(aws_template_storage_access_key_id,
+                                                    aws_template_storage_secret_access_key,
+                                                    aws_template_storage_bucket):
+    return 'us-west-2'
