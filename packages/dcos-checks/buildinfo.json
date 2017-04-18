@@ -1,0 +1,5 @@
+{
+	"state_directory": true,
+	"username": "dcos_3dt",
+    "group": "systemd-journal"
+}
