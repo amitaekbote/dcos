@@ -15,11 +15,8 @@
 package cmd
 
 import (
-	"fmt"
-
+	"context"
 	"github.com/spf13/cobra"
-	"container/list"
-	"github.com/dcos/dcos-go/dcos"
 )
 
 // clusterVersionCmd represents the check_cluster_version command
@@ -28,7 +25,7 @@ var clusterVersionCmd = &cobra.Command{
 	Short: "Check all nodes on the cluster are no more than 2 versions",
 	Long: `A cluster could be running 2 versions during an upgrade. For every other
 situation we expect that all nodes on the cluster be one version`,
-	
+
 	Run: func(cmd *cobra.Command, args []string) {
 		RunCheck(NewClusterVersionCheck("DC/OS cluster version check"))
 	},
@@ -46,16 +43,13 @@ type ClusterVersionCheck struct {
 // Run invokes a cluster version check and return error output, exit code and error.
 func (c *ClusterVersionCheck) Run(ctx context.Context, cfg *CLIConfigFlags) (string, int, error) {
 	// Get a list of all masters
-	if err := exec.Command("").Run(); err != nil {
-	
 	// Get a list of all agents
 	// Get versions for each and throw in array?
 	// Error if more than 2
+	return "", 0, nil
 }
-
 
 // ID returns a unique check identifier.
 func (c *ClusterVersionCheck) ID() string {
 	return c.Name
 }
-
