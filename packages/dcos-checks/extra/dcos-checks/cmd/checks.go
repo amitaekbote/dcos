@@ -42,3 +42,10 @@ func NewComponentCheck(name string) *ComponentCheck {
 		Name: name,
 	}
 }
+
+// NewComponentCheck returns an initialized instance of *ClusterVersionCheck
+func NewClusterVersionCheck(name string) *ClusterVersionCheck {
+	return &ClusterVersionCheck{
+		Name: name,
+	}
+}
