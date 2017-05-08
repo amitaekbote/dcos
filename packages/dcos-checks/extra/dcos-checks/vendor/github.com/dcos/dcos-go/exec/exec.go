@@ -1,10 +1,13 @@
 package exec
 
 import (
+	"bytes"
 	"context"
-	"errors"
 	"io"
 	"os/exec"
+	"time"
+
+	"github.com/pkg/errors"
 )
 
 // dcos-go/exec is a os/exec wrapper. It implements io.Reader and can be used to read both STDOUT and STDERR.
@@ -78,4 +81,70 @@ func Run(ctx context.Context, command string, arg []string) (*CommandExecutor, e
 	}()
 
 	return commandExecutor, nil
+}
+
+// Output returns stdout, stderr and error status for a given shell command
+func Output(ctx context.Context, timeout time.Duration, command ...string) ([]byte, []byte, error) {
+
+	var (
+		// define an empty cancel function
+		cancel context.CancelFunc = func() {}
+		arg    []string
+	)
+
+	if len(command) == 0 {
+		return nil, nil, errors.New("unable to execute a command with empty Cmd field")
+	}
+
+	if ctx == nil {
+		// default to 10 seconds timeout.
+		ctx, cancel = context.WithTimeout(context.Background(), time.Second*10)
+	}
+
+	if timeout != 0 {
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+	}
+
+	defer cancel()
+
+	if len(command) > 1 {
+		arg = command[1:]
+	}
+
+	cmd := exec.CommandContext(ctx, command[0], arg...)
+
+	// create stdout/stderr pipes for combined output.
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "unable to open stdout pipe")
+	}
+
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "unable to open stderr pipe")
+	}
+
+	// start command execution
+	if err := cmd.Start(); err != nil {
+		return nil, nil, errors.Wrapf(err, "unable to run command %s", command)
+	}
+
+	bufStdout := new(bytes.Buffer)
+	stdoutR := io.Reader(stdout)
+	if _, err := io.Copy(bufStdout, stdoutR); err != nil {
+		return nil, nil, errors.Wrap(err, "unable to copy")
+	}
+
+	bufStderr := new(bytes.Buffer)
+	stderrR := io.Reader(stderr)
+	if _, err := io.Copy(bufStderr, stderrR); err != nil {
+		return nil, nil, errors.Wrap(err, "unable to copy")
+	}
+
+	// do not wrap cmd.Wait() error, it is used to determine exit code
+	if err := cmd.Wait(); err != nil {
+		return bufStdout.Bytes(), bufStderr.Bytes(), errors.Wrapf(err, "unabl to wait for command %s", command)
+	}
+
+	return bufStdout.Bytes(), bufStderr.Bytes(), nil
 }

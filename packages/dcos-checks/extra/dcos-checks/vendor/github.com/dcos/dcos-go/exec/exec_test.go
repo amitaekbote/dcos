@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -85,4 +86,13 @@ func TestBadReturnCode(t *testing.T) {
 	if !strings.Contains(err.Error(), "command_no_found") {
 		t.Fatalf("Expected `command_no_found` in error output.Got: %s", err)
 	}
+}
+
+func TestOutput(t *testing.T) {
+
+	out, stderr, err := Output(nil, 0, "echo", "hello")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("output %s %s \n", out, stderr)
 }

@@ -94,10 +94,10 @@ func (t *dcosRoundtripper) GenerateToken() error {
 	t.Lock()
 	defer t.Unlock()
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"uid": t.uid,
-		"exp": time.Now().Add(t.expire).Unix(),
-	})
+	// TODO: this is very broken with the latest `jwt-go` lib version 3.0.0
+	token := jwt.New(jwt.SigningMethodRS256)
+	token.Claims["uid"] = t.uid
+	token.Claims["exp"] = time.Now().Add(t.expire).Unix()
 
 	tokenStr, err := token.SignedString([]byte(t.secret))
 	if err != nil {
